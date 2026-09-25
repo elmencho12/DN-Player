@@ -1,0 +1,23 @@
+GitHub pe upload kaise kare - 2 minute:
+
+1. github.com pe jao -> New Repository -> Name: DN-Player -> Public -> Create
+2. Is folder ki saari files ko drag & drop karo GitHub ke "Add file -> Upload files" pe
+   IMPORTANT: node_modules aur dist folder upload mat karo - .gitignore already hai
+
+3. Commit kar do
+
+4. Releases ke liye:
+   - Apne PC pe: npm run build-all
+   - dist/ folder main 2 exe banenge
+   - GitHub repo -> Releases -> Draft new release -> Tag: v1.0.0
+   - Wo 2 exe files ko wahan upload karo
+
+5. GitHub Pages ON karo:
+   - Repo Settings -> Pages -> Branch: main -> Save
+   - Tumhari website: https://YOUR_USERNAME.github.io/DN-Player/
+
+Bas ho gaya! Ab link share karo Facebook, Instagram pe.
+
+Agar upload fail ho raha hai to:
+- Sirf ye 7 files upload karo: logo.png, electron.js, package.json, README.md, index.html, .gitignore, build/icon.ico, build/installer.nsh, src/index.html
+- dist/ aur node_modules kabhi upload mat karo

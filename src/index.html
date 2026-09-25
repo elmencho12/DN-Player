@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DN Player - Death Note Edition</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,sans-serif;}
+body{background:#1a1a1a;color:#eee;overflow:hidden;height:100vh;display:flex;flex-direction:column;user-select:none;}
+
+/* Toolbar - Only one, functional */
+#toolbar{background:#2d2d2d;display:flex;align-items:center;gap:6px;padding:7px 10px;border-bottom:1px solid #444;}
+#toolbar button{background:#3a3a3a;border:1px solid #555;color:#eee;padding:6px 14px;cursor:pointer;border-radius:4px;font-size:12px;display:flex;align-items:center;gap:5px;transition:0.15s;}
+#toolbar button:hover{background:#ff0040;color:#fff;border-color:#ff0040;}
+#toolbar .sep{width:1px;height:22px;background:#555;margin:0 8px;}
+#toolbar #app-title{margin-left:auto;font-size:13px;font-weight:600;color:#ff0040;letter-spacing:0.5px;}
+
+/* Main */
+#main{flex:1;display:flex;overflow:hidden;}
+#playlist{width:260px;background:#222;border-right:1px solid #444;display:flex;flex-direction:column;z-index:2;}
+#playlist-header{background:#2d2d2d;padding:9px 12px;font-size:13px;font-weight:600;border-bottom:1px solid #444;display:flex;justify-content:space-between;align-items:center;}
+#playlist-items{flex:1;overflow-y:auto;padding:6px;}
+.playlist-item{padding:7px 10px;font-size:12px;cursor:pointer;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;transition:0.1s;}
+.playlist-item:hover{background:#333;}
+.playlist-item.active{background:#ff0040;color:#fff;}
+#playlist.hidden{display:none;}
+
+#video-container{flex:1;background:#000;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+#video{max-width:100%;max-height:100%;background:#000;width:100%;height:100%;object-fit:contain;}
+#video-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:1;}
+#drop-text{color:#666;font-size:22px;text-align:center;line-height:1.4;}
+#drop-text b{color:#ff0040;font-size:26px;display:block;margin-bottom:8px;letter-spacing:1px;}
+#drop-text small{font-size:13px;color:#555;}
+
+#controls{background:#2d2d2d;border-top:1px solid #444;padding:8px 12px;z-index:3;}
+#progress-area{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+#time-current,#time-total{font-size:11px;color:#aaa;min-width:42px;font-variant-numeric:tabular-nums;}
+#progress{flex:1;height:6px;background:#444;border-radius:3px;cursor:pointer;position:relative;}
+#progress-filled{height:100%;background:#ff0040;border-radius:3px;width:0%;pointer-events:none;}
+#progress-handle{position:absolute;top:50%;transform:translate(-50%,-50%);width:12px;height:12px;background:#ff0040;border-radius:50%;left:0%;opacity:0;transition:opacity 0.15s;}
+#progress:hover #progress-handle{opacity:1;}
+#bottom-controls{display:flex;align-items:center;gap:7px;}
+#bottom-controls button{background:#3a3a3a;border:1px solid #555;color:#eee;width:34px;height:30px;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:15px;transition:0.15s;}
+#bottom-controls button:hover{background:#ff0040;border-color:#ff0040;}
+#bottom-controls button.play{width:38px;background:#ff0040;border-color:#ff0040;}
+#volume-area{display:flex;align-items:center;gap:7px;margin-left:16px;}
+#volume-slider{width:90px;height:4px;background:#444;border-radius:2px;cursor:pointer;position:relative;}
+#volume-filled{height:100%;background:#eee;border-radius:2px;width:80%;pointer-events:none;}
+#speed{margin-left:16px;font-size:12px;color:#aaa;display:flex;align-items:center;gap:6px;}
+#speed select{background:#3a3a3a;color:#eee;border:1px solid #555;padding:3px 8px;border-radius:4px;font-size:11px;cursor:pointer;}
+#right-controls{margin-left:auto;display:flex;align-items:center;gap:7px;}
+
+/* Context Menu - VLC style right click */
+#context-menu{
+ position:fixed;
+ background:#2b2b2b;
+ border:1px solid #555;
+ border-radius:6px;
+ box-shadow:0 8px 24px rgba(0,0,0,0.6);
+ min-width:220px;
+ z-index:9999;
+ display:none;
+ padding:6px 0;
+ font-size:13px;
+}
+#context-menu .ctx-item{
+ padding:7px 14px;
+ cursor:pointer;
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+ color:#eee;
+}
+#context-menu .ctx-item:hover{background:#ff0040;color:#fff;}
+#context-menu .ctx-item .shortcut{font-size:11px;color:#999;margin-left:20px;}
+#context-menu .ctx-item:hover .shortcut{color:#fff;}
+#context-menu .ctx-sep{height:1px;background:#444;margin:5px 0;}
+#context-menu .ctx-sub{
+ position:absolute;
+ left:100%;
+ top:0;
+ background:#2b2b2b;
+ border:1px solid #555;
+ border-radius:6px;
+ min-width:160px;
+ display:none;
+ padding:6px 0;
+ box-shadow:0 8px 24px rgba(0,0,0,0.6);
+}
+#context-menu .ctx-item.has-sub{position:relative;}
+#context-menu .ctx-item.has-sub::after{content:'▶';font-size:10px;color:#999;}
+#context-menu .ctx-item.has-sub:hover .ctx-sub{display:block;}
+</style>
+</head>
+<body>
+
+<!-- Single Toolbar Only -->
+<div id="toolbar">
+<button id="btn-open">📁 Open</button>
+<button id="btn-network">🌐 Network</button>
+<div class="sep"></div>
+<button id="btn-playlist">📋 Playlist</button>
+<button id="btn-stop">⏹ Stop</button>
+<div class="sep"></div>
+<button id="btn-snapshot">📸 Snapshot</button>
+<button id="btn-fullscreen">⛶ Fullscreen</button>
+<div id="app-title">DN Player</div>
+</div>
+
+<div id="main">
+<div id="playlist">
+<div id="playlist-header"><span>Playlist</span><span style="cursor:pointer;font-size:14px;" id="playlist-close">✕</span></div>
+<div id="playlist-items"></div>
+<div style="padding:8px;border-top:1px solid #444;">
+<button style="width:100%;padding:7px;background:#3a3a3a;border:1px solid #555;color:#eee;border-radius:4px;cursor:pointer;font-size:11px;" id="btn-add">+ Add Files</button>
+</div>
+</div>
+
+<div id="video-container">
+<video id="video"></video>
+<div id="video-overlay">
+<div id="drop-text"><b>DN PLAYER</b>Drop files here or click Open<br><small>Death Note Edition</small></div>
+</div>
+</div>
+</div>
+
+<div id="controls">
+<div id="progress-area">
+<span id="time-current">00:00</span>
+<div id="progress"><div id="progress-filled"></div><div id="progress-handle"></div></div>
+<span id="time-total">00:00</span>
+</div>
+<div id="bottom-controls">
+<button id="btn-prev" title="Previous">⏮</button>
+<button id="btn-play" class="play" title="Play/Pause (Space)">▶</button>
+<button id="btn-next" title="Next">⏭</button>
+<button id="btn-stop2" title="Stop">⏹</button>
+<div id="volume-area">
+<button id="btn-mute" title="Mute">🔊</button>
+<div id="volume-slider"><div id="volume-filled"></div></div>
+</div>
+<div id="speed">
+<label style="font-size:11px;">Speed</label>
+<select id="speed-select">
+<option value="0.25">0.25x</option>
+<option value="0.5">0.5x</option>
+<option value="0.75">0.75x</option>
+<option value="1" selected>1x</option>
+<option value="1.25">1.25x</option>
+<option value="1.5">1.5x</option>
+<option value="2">2x</option>
+<option value="4">4x</option>
+</select>
+</div>
+<div id="right-controls">
+<button id="btn-loop" title="Loop">🔁</button>
+<button id="btn-shuffle" title="Shuffle">🔀</button>
+<button id="btn-full" title="Fullscreen (F)">⛶</button>
+</div>
+</div>
+</div>
+
+<!-- VLC Style Context Menu -->
+<div id="context-menu">
+<div class="ctx-item" data-action="play-pause">Play / Pause <span class="shortcut">Space</span></div>
+<div class="ctx-item" data-action="stop">Stop <span class="shortcut">S</span></div>
+<div class="ctx-sep"></div>
+<div class="ctx-item" data-action="prev">Previous <span class="shortcut">P</span></div>
+<div class="ctx-item" data-action="next">Next <span class="shortcut">N</span></div>
+<div class="ctx-sep"></div>
+<div class="ctx-item has-sub">Speed
+  <div class="ctx-sub">
+    <div class="ctx-item" data-action="speed-0.25">0.25x</div>
+    <div class="ctx-item" data-action="speed-0.5">0.5x</div>
+    <div class="ctx-item" data-action="speed-1">Normal</div>
+    <div class="ctx-item" data-action="speed-1.5">1.5x</div>
+    <div class="ctx-item" data-action="speed-2">2x</div>
+  </div>
+</div>
+<div class="ctx-item has-sub">Aspect Ratio
+  <div class="ctx-sub">
+    <div class="ctx-item" data-action="aspect-default">Default</div>
+    <div class="ctx-item" data-action="aspect-16-9">16:9</div>
+    <div class="ctx-item" data-action="aspect-4-3">4:3</div>
+    <div class="ctx-item" data-action="aspect-fill">Fill</div>
+  </div>
+</div>
+<div class="ctx-sep"></div>
+<div class="ctx-item" data-action="fullscreen">Fullscreen <span class="shortcut">F</span></div>
+<div class="ctx-item" data-action="snapshot">Take Snapshot <span class="shortcut">Shift+S</span></div>
+<div class="ctx-sep"></div>
+<div class="ctx-item" data-action="add-subtitle">Add Subtitle File...</div>
+<div class="ctx-item" data-action="open-file">Open File... <span class="shortcut">Ctrl+O</span></div>
+<div class="ctx-item" data-action="open-network">Open Network Stream...</div>
+<div class="ctx-sep"></div>
+<div class="ctx-item" data-action="playlist">Toggle Playlist <span class="shortcut">Ctrl+L</span></div>
+</div>
+
+<input type="file" id="file-input" multiple accept="video/*,audio/*,.mkv,.mp4,.avi,.mov,.mp3,.flac,.wav" style="display:none;">
+<input type="file" id="subtitle-input" accept=".srt,.vtt" style="display:none;">
+
+<script>
+const video=document.getElementById('video');
+const fileInput=document.getElementById('file-input');
+const subtitleInput=document.getElementById('subtitle-input');
+const playlistItems=document.getElementById('playlist-items');
+const progress=document.getElementById('progress');
+const progressFilled=document.getElementById('progress-filled');
+const progressHandle=document.getElementById('progress-handle');
+const timeCurrent=document.getElementById('time-current');
+const timeTotal=document.getElementById('time-total');
+const videoOverlay=document.getElementById('video-overlay');
+const volumeSlider=document.getElementById('volume-slider');
+const volumeFilled=document.getElementById('volume-filled');
+const contextMenu=document.getElementById('context-menu');
+let playlist=[],currentIndex=-1,isLoop=false,isShuffle=false;
+
+function formatTime(s){ if(isNaN(s)) return '00:00'; const m=Math.floor(s/60).toString().padStart(2,'0'); const sec=Math.floor(s%60).toString().padStart(2,'0'); return `${m}:${sec}`; }
+function addFiles(files){ for(let f of files){ playlist.push({file:f,url:URL.createObjectURL(f),name:f.name}); } renderPlaylist(); if(currentIndex===-1&&playlist.length>0) playIndex(0); }
+function renderPlaylist(){ playlistItems.innerHTML=''; playlist.forEach((item,i)=>{ const div=document.createElement('div'); div.className='playlist-item'+(i===currentIndex?' active':''); div.textContent=item.name; div.onclick=()=>playIndex(i); playlistItems.appendChild(div); }); }
+function playIndex(i){ if(i<0||i>=playlist.length) return; currentIndex=i; video.src=playlist[i].url; video.play(); videoOverlay.style.display='none'; renderPlaylist(); }
+
+document.getElementById('btn-open').onclick=()=>fileInput.click();
+document.getElementById('btn-add').onclick=()=>fileInput.click();
+fileInput.onchange=(e)=>{ addFiles(e.target.files); };
+
+document.getElementById('btn-play').onclick=()=>{ if(video.paused) video.play(); else video.pause(); };
+video.onplay=()=>{ document.getElementById('btn-play').textContent='⏸'; videoOverlay.style.display='none'; };
+video.onpause=()=>{ document.getElementById('btn-play').textContent='▶'; };
+
+document.getElementById('btn-stop').onclick=document.getElementById('btn-stop2').onclick=()=>{ video.pause(); video.currentTime=0; };
+document.getElementById('btn-prev').onclick=()=>{ if(currentIndex>0) playIndex(currentIndex-1); };
+document.getElementById('btn-next').onclick=()=>{ if(isShuffle){ playIndex(Math.floor(Math.random()*playlist.length)); }else if(currentIndex<playlist.length-1){ playIndex(currentIndex+1); }else if(isLoop){ playIndex(0); } };
+
+video.ontimeupdate=()=>{ const pct=(video.currentTime/video.duration)*100; progressFilled.style.width=pct+'%'; progressHandle.style.left=pct+'%'; timeCurrent.textContent=formatTime(video.currentTime); };
+video.onloadedmetadata=()=>{ timeTotal.textContent=formatTime(video.duration); };
+progress.onclick=(e)=>{ const rect=progress.getBoundingClientRect(); const pct=(e.clientX-rect.left)/rect.width; video.currentTime=pct*video.duration; };
+volumeSlider.onclick=(e)=>{ const rect=volumeSlider.getBoundingClientRect(); const pct=(e.clientX-rect.left)/rect.width; video.volume=pct; volumeFilled.style.width=(pct*100)+'%'; };
+document.getElementById('btn-mute').onclick=()=>{ video.muted=!video.muted; document.getElementById('btn-mute').textContent=video.muted?'🔇':'🔊'; };
+document.getElementById('speed-select').onchange=(e)=>{ video.playbackRate=parseFloat(e.target.value); };
+document.getElementById('btn-full').onclick=document.getElementById('btn-fullscreen').onclick=()=>{ if(document.fullscreenElement) document.exitFullscreen(); else document.getElementById('video-container').requestFullscreen(); };
+document.getElementById('btn-playlist').onclick=()=>{ document.getElementById('playlist').classList.toggle('hidden'); };
+document.getElementById('playlist-close').onclick=()=>{ document.getElementById('playlist').classList.add('hidden'); };
+document.getElementById('btn-loop').onclick=(e)=>{ isLoop=!isLoop; e.target.style.background=isLoop?'#ff0040':'#3a3a3a'; };
+document.getElementById('btn-shuffle').onclick=(e)=>{ isShuffle=!isShuffle; e.target.style.background=isShuffle?'#ff0040':'#3a3a3a'; };
+function takeSnapshot(){ if(!video.src) return; const canvas=document.createElement('canvas'); canvas.width=video.videoWidth; canvas.height=video.videoHeight; canvas.getContext('2d').drawImage(video,0,0); const a=document.createElement('a'); a.download='DN-Snapshot-'+Date.now()+'.png'; a.href=canvas.toDataURL(); a.click(); }
+document.getElementById('btn-snapshot').onclick=takeSnapshot;
+document.getElementById('btn-network').onclick=()=>{ const url=prompt('Enter Network URL (m3u8, mp4):'); if(url){ playlist.push({file:null,url:url,name:url}); renderPlaylist(); playIndex(playlist.length-1); } };
+
+const container=document.getElementById('video-container');
+container.ondragover=(e)=>{ e.preventDefault(); container.style.background='#111'; };
+container.ondragleave=()=>{ container.style.background='#000'; };
+container.ondrop=(e)=>{ e.preventDefault(); container.style.background='#000'; addFiles(e.dataTransfer.files); };
+
+/* Context Menu Logic */
+container.addEventListener('contextmenu',(e)=>{
+  e.preventDefault();
+  contextMenu.style.display='block';
+  contextMenu.style.left=e.pageX+'px';
+  contextMenu.style.top=e.pageY+'px';
+  // Keep inside viewport
+  const rect=contextMenu.getBoundingClientRect();
+  if(rect.right>window.innerWidth){ contextMenu.style.left=(e.pageX-rect.width)+'px'; }
+  if(rect.bottom>window.innerHeight){ contextMenu.style.top=(e.pageY-rect.height)+'px'; }
+});
+
+document.addEventListener('click',()=>{ contextMenu.style.display='none'; });
+
+contextMenu.addEventListener('click',(e)=>{
+  const action=e.target.closest('.ctx-item')?.dataset.action;
+  if(!action) return;
+  handleAction(action);
+  contextMenu.style.display='none';
+});
+
+function handleAction(action){
+  switch(action){
+    case 'play-pause': if(video.paused) video.play(); else video.pause(); break;
+    case 'stop': video.pause(); video.currentTime=0; break;
+    case 'prev': document.getElementById('btn-prev').click(); break;
+    case 'next': document.getElementById('btn-next').click(); break;
+    case 'fullscreen': document.getElementById('video-container').requestFullscreen(); break;
+    case 'snapshot': takeSnapshot(); break;
+    case 'open-file': fileInput.click(); break;
+    case 'open-network': document.getElementById('btn-network').click(); break;
+    case 'playlist': document.getElementById('playlist').classList.toggle('hidden'); break;
+    case 'add-subtitle': subtitleInput.click(); break;
+    case 'speed-0.25': video.playbackRate=0.25; document.getElementById('speed-select').value=0.25; break;
+    case 'speed-0.5': video.playbackRate=0.5; document.getElementById('speed-select').value=0.5; break;
+    case 'speed-1': video.playbackRate=1; document.getElementById('speed-select').value=1; break;
+    case 'speed-1.5': video.playbackRate=1.5; document.getElementById('speed-select').value=1.5; break;
+    case 'speed-2': video.playbackRate=2; document.getElementById('speed-select').value=2; break;
+    case 'aspect-default': video.style.objectFit='contain'; break;
+    case 'aspect-16-9': video.style.objectFit='fill'; video.style.aspectRatio='16/9'; break;
+    case 'aspect-4-3': video.style.objectFit='fill'; video.style.aspectRatio='4/3'; break;
+    case 'aspect-fill': video.style.objectFit='cover'; break;
+  }
+}
+
+subtitleInput.onchange=(e)=>{
+  const file=e.target.files[0];
+  if(!file) return;
+  const url=URL.createObjectURL(file);
+  // Remove old tracks
+  const old=document.querySelector('track');
+  if(old) old.remove();
+  const track=document.createElement('track');
+  track.kind='subtitles'; track.label='Subtitle'; track.src=url; track.default=true;
+  video.appendChild(track);
+};
+
+document.onkeydown=(e)=>{
+  if(e.code==='Space'){ e.preventDefault(); if(video.paused) video.play(); else video.pause(); }
+  if(e.key==='f'||e.key==='F'){ document.getElementById('video-container').requestFullscreen(); }
+  if(e.key==='m'||e.key==='M'){ video.muted=!video.muted; }
+  if(e.key==='n'||e.key==='N'){ document.getElementById('btn-next').click(); }
+  if(e.key==='p'||e.key==='P'){ document.getElementById('btn-prev').click(); }
+  if(e.key==='s'||e.key==='S'){ if(e.shiftKey) takeSnapshot(); else { video.pause(); video.currentTime=0; } }
+};
+video.onended=()=>{ document.getElementById('btn-next').click(); };
+</script>
+</body>
+</html>
