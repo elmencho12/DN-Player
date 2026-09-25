@@ -33,7 +33,13 @@ Made with ❤️ in Sharqpur, Pakistan
 by **Jhony Walker Studio**
 
 ### 📸 Screenshots
-(Add your screenshots here)
+### 📸 Screenshots
+![Main Player](screenshots/player.png)
+![Right Click Menu](screenshots/menu.png)
+![Playlist](screenshots/playlist.png)
+
+### 📸 Demo
+![DN Player Logo](logo.png)
 
 ### 🛠️ Tech Stack
 - Electron
